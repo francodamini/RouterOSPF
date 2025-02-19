@@ -181,8 +181,6 @@ void sr_handle_ip_packet(struct sr_instance *sr,
 {
   /*Obtener el cabezal IP y direcciones*/
   sr_ip_hdr_t *ipHdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-  printf("Paquete recibido: \n");
-  print_hdrs(packet, len);
 
   /* Obtengo las direcciones IP */
   uint32_t senderIP = ipHdr->ip_src;
@@ -226,7 +224,6 @@ void sr_handle_ip_packet(struct sr_instance *sr,
     }
     else
     {
-      printf("Aca\n");
       /* Paquete UDP o TCP, responder con ICMP port unreachable */
       sr_send_icmp_error_packet(3, 3, sr, ipHdr->ip_src, packet + sizeof(sr_ethernet_hdr_t));
     }
@@ -236,13 +233,6 @@ void sr_handle_ip_packet(struct sr_instance *sr,
   /* Si no es para este router, disminuir TTL y reenviar */
   ipHdr->ip_ttl--;
 
-  if (ipHdr->ip_ttl < 1)
-  {
-    /* Enviar ICMP time exceeded */
-    sr_send_icmp_error_packet(11, 0, sr, ipHdr->ip_src, packet + sizeof(sr_ethernet_hdr_t));
-    return;
-  }
-
   struct sr_rt *rtEntry = sr_longest_prefix_match(sr, ipHdr->ip_dst);
   printf("Longest prefix match: \n");
   if (rtEntry)
@@ -250,13 +240,16 @@ void sr_handle_ip_packet(struct sr_instance *sr,
     sr_print_routing_entry(rtEntry);
   }
   else
-    printf('No hay entrada en routing table.\n');
-
-  if (rtEntry == NULL)
   {
     printf("Entrada no encontrada \n");
-    /* No hay coincidencia en la tabla de enrutamiento, enviar ICMP net unreachable */
     sr_send_icmp_error_packet(3, 0, sr, ipHdr->ip_src, packet + sizeof(sr_ethernet_hdr_t));
+    return;
+  }
+
+  if (ipHdr->ip_ttl < 1)
+  {
+    /* Enviar ICMP time exceeded */
+    sr_send_icmp_error_packet(11, 0, sr, ipHdr->ip_src, packet + sizeof(sr_ethernet_hdr_t));
     return;
   }
 
